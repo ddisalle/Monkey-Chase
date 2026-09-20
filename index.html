@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monkey Chase</title>
+<style>
+:root{
+  --sage:#78966f; --sage-dark:#4f7049;
+  --tan:#d8b982; --tan-dark:#9a7040;
+  --cream:#fff7e6; --ink:#2d3528; --green:#5f8d4d;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; min-height:100vh; font-family:Arial,Helvetica,sans-serif;
+  color:var(--ink);
+  background:linear-gradient(135deg,#31552e,#78966f 50%,#d8b982);
+}
+button{font:inherit}
+.wrap{width:min(1100px,96%);margin:20px auto}
+.panel{
+  background:var(--cream); border:3px solid var(--tan-dark);
+  border-radius:14px; padding:16px; box-shadow:0 5px 0 #76552f;
+}
+.title{
+  text-align:center; padding:18px;
+  background:linear-gradient(135deg,#d8b982,#b8d18d);
+}
+.title h1{
+  margin:0;color:#31552e;font-size:clamp(34px,6vw,64px);
+  text-shadow:2px 2px #f5e4bd;
+}
+.title p{margin:5px 0 0;font-size:20px;font-weight:bold}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+.foods{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.food{
+  min-height:120px;background:#f4dfb8;border:2px solid var(--tan-dark);
+  border-radius:12px;cursor:pointer;font-weight:bold;display:flex;
+  flex-direction:column;align-items:center;justify-content:center;gap:5px
+}
+.food.selected{background:#b8d989;box-shadow:inset 0 0 0 4px #5c8b45}
+.food .emoji{font-size:48px}
+.main-btn,.secondary-btn{
+  min-height:48px;border-radius:10px;font-weight:800;border:2px solid var(--tan-dark);
+  cursor:pointer;padding:10px 18px
+}
+.main-btn{background:var(--green);color:#fff}
+.secondary-btn{background:#d9b77e;color:var(--ink)}
+.full{width:100%}
+.game-top{display:flex;align-items:center;justify-content:space-between;gap:15px}
+.game-top h2{margin:0;color:#31552e;font-size:32px}
+.stats{display:flex;gap:25px;text-align:center}
+.stat small{display:block;font-weight:bold;text-transform:uppercase}
+.stat strong{font-size:34px}
+.game-layout{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:16px;margin-top:16px}
+.board{
+  display:grid;grid-template-columns:repeat(8,1fr);width:min(720px,100%);
+  aspect-ratio:1;margin:auto;border:8px solid var(--tan-dark);
+  border-radius:12px;overflow:hidden;background:var(--tan-dark)
+}
+.cell{
+  display:flex;align-items:center;justify-content:center;aspect-ratio:1;
+  border:1px solid rgba(50,55,40,.22);font-size:clamp(22px,6vw,52px);
+  position:relative
+}
+.cell.sage{background:var(--sage)}
+.cell.tan{background:var(--tan)}
+.cell.player{outline:4px solid #e8f36a;outline-offset:-4px}
+.cell .piece,.cell .monkey,.cell .obstacle{filter:drop-shadow(1px 3px 1px rgba(0,0,0,.25))}
+.controls{display:grid;grid-template-columns:repeat(3,1fr);max-width:240px;margin:14px auto 0;gap:6px}
+.status{text-align:center;font-weight:bold;min-height:25px;margin-top:8px}
+.end{text-align:center}
+.hidden{display:none!important}
+@media(max-width:800px){
+  .grid2,.game-layout{grid-template-columns:1fr}
+  .game-top{flex-direction:column}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<section id="menu">
+  <div class="panel title">
+    <h1>🐒 MONKEY CHASE</h1>
+    <p>Get to the basket in the fewest moves!</p>
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <h2>Choose Your Food</h2>
+      <div id="foods" class="foods"></div>
+      <button id="start" class="main-btn full" style="margin-top:14px">▶ START GAME</button>
+    </div>
+
+    <div class="panel">
+      <h2>How to Play</h2>
+      <ol>
+        <li>Choose your food.</li>
+        <li>Your food starts in the bottom-left corner.</li>
+        <li>Reach the basket in the top-right corner.</li>
+        <li>Move up, down, left, or right. No diagonal moves.</li>
+        <li>Each game has exactly 3 trees and 2 rocks.</li>
+        <li>Trees and rocks block movement.</li>
+        <li>The monkey moves after every move and chases you.</li>
+        <li>If the monkey becomes adjacent to you, the game ends.</li>
+        <li>Your score is the number of moves used to reach the basket. Lower is better!</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section id="game" class="hidden">
+  <div class="panel game-top">
+    <div>
+      <h2>🐒 MONKEY CHASE</h2>
+      <div id="foodLabel"></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><small>Moves</small><strong id="moves">0</strong></div>
+      <div class="stat"><small>Best</small><strong id="best">—</strong></div>
+    </div>
+  </div>
+
+  <div class="game-layout">
+    <div class="panel">
+      <div id="board" class="board" aria-label="Monkey Chase board"></div>
+      <div id="status" class="status" aria-live="polite"></div>
+      <div class="controls">
+        <span></span><button class="secondary-btn" data-dir="up">⬆️</button><span></span>
+        <button class="secondary-btn" data-dir="left">⬅️</button>
+        <button class="secondary-btn" data-dir="down">⬇️</button>
+        <button class="secondary-btn" data-dir="right">➡️</button>
+      </div>
+      <p style="text-align:center;font-size:13px">Arrow keys or WASD</p>
+    </div>
+
+    <aside>
+      <div class="panel">
+        <h3>🎯 Goal</h3>
+        <p>Get your food to the 🧺 basket in the <strong>fewest moves possible</strong>.</p>
+      </div>
+      <div class="panel" style="margin-top:14px">
+        <h3>🌳 Use Cover</h3>
+        <p>Every game has 3 trees and 2 rocks. Use them to change the monkey's route.</p>
+      </div>
+      <div class="panel" style="margin-top:14px">
+        <h3>🐒 Monkey</h3>
+        <p>The monkey chooses a move that brings it closer to you. If several moves are equally good, it chooses randomly.</p>
+      </div>
+      <button id="newGame" class="main-btn full" style="margin-top:14px">🔄 NEW GAME</button>
+      <button id="menuBtn" class="secondary-btn full" style="margin-top:8px">🏠 BACK TO MENU</button>
+    </aside>
+  </div>
+</section>
+
+<section id="end" class="hidden">
+  <div id="endPanel" class="panel end"></div>
+  <div style="text-align:center;margin-top:16px">
+    <button id="again" class="main-btn">🔄 PLAY AGAIN</button>
+    <button id="endMenu" class="secondary-btn">🏠 MENU</button>
+  </div>
+</section>
+
+</div>
+
+<script>
+const SIZE=8;
+const playerStart={r:7,c:0};
+const monkeyStart={r:0,c:6};
+const basket={r:0,c:7};
+
+const foods=[
+  {name:"Banana",emoji:"🍌"},
+  {name:"Apple",emoji:"🍎"},
+  {name:"Broccoli",emoji:"🥦"},
+  {name:"Carrot",emoji:"🥕"}
+];
+
+const dirs=[
+  {name:"up",r:-1,c:0},
+  {name:"down",r:1,c:0},
+  {name:"left",r:0,c:-1},
+  {name:"right",r:0,c:1}
+];
+
+let selected=0;
+let player={...playerStart};
+let monkey={...monkeyStart};
+let obstacles=new Map();
+let moves=0;
+let gameOver=false;
+let bestScore=null;
+
+const $=id=>document.getElementById(id);
+const key=(r,c)=>`${r},${c}`;
+const inside=(r,c)=>r>=0&&r<SIZE&&c>=0&&c<SIZE;
+const corner=(r,c)=>(r===0||r===7)&&(c===0||c===7);
+const manhattan=(a,b)=>Math.abs(a.r-b.r)+Math.abs(a.c-b.c);
+
+function renderFoods(){
+  $("foods").innerHTML=foods.map((f,i)=>`
+    <button class="food ${i===selected?"selected":""}" data-food="${i}">
+      <span class="emoji">${f.emoji}</span><span>${f.name}</span>
+    </button>`).join("");
+
+  document.querySelectorAll("[data-food]").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      selected=Number(btn.dataset.food);
+      renderFoods();
+    });
+  });
+}
+
+function pathExists(start,target,obs){
+  const queue=[start];
+  const seen=new Set([key(start.r,start.c)]);
+
+  while(queue.length){
+    const p=queue.shift();
+    if(p.r===target.r&&p.c===target.c)return true;
+
+    for(const d of dirs){
+      const nr=p.r+d.r,nc=p.c+d.c,k=key(nr,nc);
+      if(inside(nr,nc)&&!obs.has(k)&&!seen.has(k)){
+        seen.add(k);
+        queue.push({r:nr,c:nc});
+      }
+    }
+  }
+  return false;
+}
+
+function generateObstacles(){
+  const cells=[];
+
+  for(let r=0;r<SIZE;r++){
+    for(let c=0;c<SIZE;c++){
+      if(corner(r,c))continue;
+      if((r===monkeyStart.r&&c===monkeyStart.c)||
+         (r===playerStart.r&&c===playerStart.c)||
+         (r===basket.r&&c===basket.c))continue;
+      cells.push({r,c});
+    }
+  }
+
+  for(let attempt=0;attempt<500;attempt++){
+    const shuffled=[...cells].sort(()=>Math.random()-0.5);
+    const obs=new Map();
+
+    shuffled.slice(0,5).forEach((p,i)=>{
+      obs.set(key(p.r,p.c),i<3?"tree":"rock");
+    });
+
+    if(pathExists(playerStart,basket,obs))return obs;
+  }
+
+  return new Map([
+    [key(3,2),"tree"],[key(4,5),"tree"],[key(5,1),"tree"],
+    [key(2,4),"rock"],[key(6,4),"rock"]
+  ]);
+}
+
+function render(){
+  const board=$("board");
+  board.innerHTML="";
+
+  for(let r=0;r<SIZE;r++){
+    for(let c=0;c<SIZE;c++){
+      const cell=document.createElement("div");
+      cell.className="cell "+((r+c)%2?"tan":"sage");
+
+      const k=key(r,c);
+      const obstacle=obstacles.get(k);
+
+      if(r===basket.r&&c===basket.c)cell.innerHTML="🧺";
+      if(obstacle)cell.innerHTML=obstacle==="tree"?"🌳":"🪨";
+      if(r===monkey.r&&c===monkey.c)cell.innerHTML='<span class="monkey">🐒</span>';
+      if(r===player.r&&c===player.c){
+        cell.classList.add("player");
+        cell.innerHTML='<span class="piece">'+foods[selected].emoji+"</span>";
+      }
+
+      board.appendChild(cell);
+    }
+  }
+
+  $("moves").textContent=moves;
+  $("best").textContent=bestScore===null?"—":bestScore;
+  $("foodLabel").textContent=foods[selected].emoji+" "+foods[selected].name;
+}
+
+function playerCanMove(d){
+  const nr=player.r+d.r,nc=player.c+d.c;
+  return inside(nr,nc)&&!obstacles.has(key(nr,nc));
+}
+
+/* Find actual shortest path distance around obstacles.
+   This makes the monkey smarter than simply using Manhattan distance. */
+function distanceAroundObstacles(start,target){
+  const queue=[{...start,dist:0}];
+  const seen=new Set([key(start.r,start.c)]);
+
+  while(queue.length){
+    const p=queue.shift();
+    if(p.r===target.r&&p.c===target.c)return p.dist;
+
+    for(const d of dirs){
+      const nr=p.r+d.r,nc=p.c+d.c,k=key(nr,nc);
+      if(!inside(nr,nc)||obstacles.has(k)||seen.has(k))continue;
+      seen.add(k);
+      queue.push({r:nr,c:nc,dist:p.dist+1});
+    }
+  }
+  return Infinity;
+}
+
+function moveMonkey(){
+  const candidates=[];
+
+  for(const d of dirs){
+    const nr=monkey.r+d.r,nc=monkey.c+d.c;
+    if(!inside(nr,nc))continue;
+    if(obstacles.has(key(nr,nc)))continue;
+    if(nr===basket.r&&nc===basket.c)continue;
+
+    const dist=distanceAroundObstacles({r:nr,c:nc},player);
+    candidates.push({pos:{r:nr,c:nc},dist});
+  }
+
+  if(!candidates.length)return;
+
+  const best=Math.min(...candidates.map(x=>x.dist));
+  const choices=candidates.filter(x=>x.dist===best);
+  monkey=choices[Math.floor(Math.random()*choices.length)].pos;
+}
+
+function startGame(){
+  player={...playerStart};
+  monkey={...monkeyStart};
+  moves=0;
+  gameOver=false;
+  obstacles=generateObstacles();
+
+  $("menu").classList.add("hidden");
+  $("end").classList.add("hidden");
+  $("game").classList.remove("hidden");
+  $("status").textContent="";
+  render();
+}
+
+function finish(won){
+  gameOver=true;
+  $("game").classList.add("hidden");
+  $("end").classList.remove("hidden");
+
+  if(won){
+    const newBest=bestScore===null||moves<bestScore;
+    if(newBest)bestScore=moves;
+
+    $("endPanel").innerHTML=`
+      <div style="font-size:60px">🎉🧺</div>
+      <h1>YOU MADE IT!</h1>
+      <p>Your ${foods[selected].name.toLowerCase()} reached the basket in:</p>
+      <div style="font-size:54px;font-weight:900">${moves} moves</div>
+      <p><strong>${newBest?"🏆 NEW BEST SCORE!":"Can you beat your best?"}</strong></p>`;
+  }else{
+    $("endPanel").innerHTML=`
+      <div style="font-size:60px">🐒😱</div>
+      <h1>THE MONKEY GOT TOO CLOSE!</h1>
+      <p>You survived for <strong>${moves} moves</strong>.</p>
+      <p>Try using the trees and rocks differently!</p>`;
+  }
+}
+
+function makeMove(name){
+  if(gameOver)return;
+
+  const d=dirs.find(x=>x.name===name);
+  if(!d)return;
+
+  if(!playerCanMove(d)){
+    $("status").textContent="That space is blocked!";
+    return;
+  }
+
+  player={r:player.r+d.r,c:player.c+d.c};
+  moves++;
+  $("status").textContent="";
+
+  if(player.r===basket.r&&player.c===basket.c){
+    render();
+    finish(true);
+    return;
+  }
+
+  moveMonkey();
+  render();
+
+  if(manhattan(player,monkey)<=1){
+    finish(false);
+  }
+}
+
+document.querySelectorAll("[data-dir]").forEach(btn=>{
+  btn.addEventListener("click",()=>makeMove(btn.dataset.dir));
+});
+
+document.addEventListener("keydown",e=>{
+  if($("game").classList.contains("hidden")||gameOver)return;
+
+  const map={
+    ArrowUp:"up",ArrowDown:"down",ArrowLeft:"left",ArrowRight:"right",
+    w:"up",W:"up",s:"down",S:"down",a:"left",A:"left",d:"right",D:"right"
+  };
+
+  if(map[e.key]){
+    e.preventDefault();
+    makeMove(map[e.key]);
+  }
+});
+
+function menu(){
+  gameOver=true;
+  $("game").classList.add("hidden");
+  $("end").classList.add("hidden");
+  $("menu").classList.remove("hidden");
+  renderFoods();
+}
+
+$("start").addEventListener("click",startGame);
+$("newGame").addEventListener("click",startGame);
+$("again").addEventListener("click",startGame);
+$("menuBtn").addEventListener("click",menu);
+$("endMenu").addEventListener("click",menu);
+
+renderFoods();
+</script>
+</body>
+</html>
